@@ -1,0 +1,8 @@
+env
+__pycache__
+.DS_Store
+/csv_outputs/
+/render/public/csv/
+/render/node_modules
+*.log
+
