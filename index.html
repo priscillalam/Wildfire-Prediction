@@ -41,9 +41,8 @@
             }
 
             .site {
-            	stroke-width: .5px;
-                stroke: #333;
-                fill: #ffbaba;
+                stroke-width: 1px;
+                stroke: rgba(0,0,0,0.25);
             }
 
             #map_slider {
@@ -168,6 +167,18 @@
                             parseInt(d.unknown_acres_burned) + parseInt(d.natural_acres_burned);
                         let maxDotSizePx = 10;
                          return Math.min(maxDotSizePx, (totalAcresBurned / clipToNumberOfAcres));
+                    })
+                    .attr("fill", function(d) {
+                        let human_acres_burned = parseInt(d.human_acres_burned);
+                        let unknown_acres_burned = parseInt(d.unknown_acres_burned);
+                        let natural_acres_burned = parseInt(d.natural_acres_burned);
+                        if (human_acres_burned >= unknown_acres_burned && human_acres_burned >= natural_acres_burned) {
+                            return "#63cdda";
+                        }
+                        if (unknown_acres_burned >= human_acres_burned && unknown_acres_burned >= natural_acres_burned) {
+                            return "#f7d794";
+                        }
+                        return "#f8a5c2";
                     });
 
                 sites
