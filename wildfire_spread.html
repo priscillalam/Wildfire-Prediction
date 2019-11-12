@@ -7,6 +7,7 @@
             color: rgba(255, 255, 255, 0.75);
             font-family: "Courier";
         }
+
         canvas {
             display: block;
             position: relative;
@@ -15,17 +16,20 @@
             border-radius: 60px;
             border: 4px solid rgba(255, 255, 255, 0.75);
         }
+
         #text-container {
             margin-left: auto;
             margin-right: auto;
             width: 928px;
             margin-bottom: 40px;
         }
+
         #title {
             text-align: center;
             margin-bottom: 40px;
             font-size: 20px;
         }
+
         span {
             font-weight: bold;
         }
@@ -33,17 +37,22 @@
     <script>
         const IMAGE_WIDTH = 928;
         const IMAGE_HEIGHT = 800;
+
         const STATE_EMPTY = 0;
         const STATE_TREE = STATE_EMPTY + 1;
         const STATE_BURNING = STATE_TREE + 1;
         const STATE_BURNED = STATE_BURNING + 1;
+
         const MAX_HUE_DELTA = 36;
         const BURNABLE_AREA_HUE = 90;
         const DARKEN_DELTA = 128;
-        const RANDOM_BURN_RATE_PROBABILITY = 0.000005;
+
+        const RANDOM_BURN_RATE_PROBABILITY = 0.000005; // From https://iopscience.iop.org/article/10.1088/1367-2630/4/1/317
         const TRANSMISSION_PROBABILITY = 0.3;
-        const TREE_REGENERATION_PROBABILITY = 0.2;
+        const TREE_REGENERATION_PROBABILITY = 0.592;
+
         const IMAGE_URL = 'https://petapixel.com/assets/uploads/2017/01/large2014.jpg';
+
         let originalPatch;
         let context;
         let state = Array(IMAGE_WIDTH);
@@ -64,6 +73,7 @@
                 rr = diffc(rabs);
                 gg = diffc(gabs);
                 bb = diffc(babs);
+
                 if (rabs === v) {
                     h = bb - gg;
                 } else if (gabs === v) {
@@ -83,6 +93,7 @@
                 v: percentRoundFn(v * 100)
             };
         }
+
         function onLoad() {
             let canvas = document.getElementById("canvas");
             context = canvas.getContext("2d");
@@ -94,6 +105,7 @@
                     0,
                     IMAGE_WIDTH,
                     IMAGE_HEIGHT);
+
                 for (let x = 0; x < IMAGE_WIDTH; x++) {
                     state[x] = Array(IMAGE_HEIGHT);
                     for (let y = 0; y < IMAGE_HEIGHT; y++) {
@@ -112,6 +124,7 @@
             image.src = IMAGE_URL;
             populateHtml();
         }
+
         function hsvOfPixel(x, y) {
             let patchImageDataStartIndex = 4 * (y * IMAGE_WIDTH + x);
             let red = originalPatch.data[patchImageDataStartIndex];
@@ -120,6 +133,7 @@
             let hsv = rgb2hsv(red, green, blue);
             return hsv;
         }
+
         function runLoop() {
             render();
             let newState = Array(IMAGE_WIDTH);
@@ -159,6 +173,7 @@
             state = newState;
             setTimeout(runLoop, 100);
         }
+
         function render() {
             let buffer = new Uint8ClampedArray(IMAGE_WIDTH * IMAGE_HEIGHT * 4); 
             for (let x = 0; x < IMAGE_WIDTH; x++) {
@@ -174,6 +189,7 @@
                         buffer[imageDataIndex + 1] = 0;
                         buffer[imageDataIndex + 2] = 255;
                         buffer[imageDataIndex + 3] = originalPatch.data[imageDataIndex + 3];
+
                     } else {
                         buffer[imageDataIndex] = originalPatch.data[imageDataIndex];
                         buffer[imageDataIndex + 1] = originalPatch.data[imageDataIndex + 1];
@@ -186,9 +202,11 @@
             imageData.data.set(buffer);
             context.putImageData(imageData, 0, 0);
         }
+
         function darken(value) {
             return Math.max(value - DARKEN_DELTA, 0);
         }
+
         function areAnyNeighborsBurning(pixelX, pixelY) {
             for (let x = pixelX - 1; x <= pixelX + 1; x++) {
                 for (let y = pixelY - 1; y <= pixelY + 1; y++) {
@@ -202,6 +220,7 @@
             }
             return false;
         }
+
         function populateHtml() {
             document.getElementById("MAX_HUE_DELTA").innerHTML = MAX_HUE_DELTA;
             document.getElementById("BURNABLE_AREA_HUE").innerHTML = BURNABLE_AREA_HUE;
