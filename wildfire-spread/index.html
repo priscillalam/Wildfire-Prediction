@@ -231,7 +231,7 @@
     </script>
     <body>
         <div id="text-container">
-            <div id="title">Wildfire Cellular Automata</div>
+            <div id="title">Wildfire Spread</div>
             This models wildfire spread through cellular automata. Any pixel in this image that has a hue +/- <span id="MAX_HUE_DELTA"></span> of <span id="BURNABLE_AREA_HUE"></span> is considered a tree. Any other cell is considered empty. At each timestep, a tree can ignite with a <span id="RANDOM_BURN_RATE_PROBABILITY"></span> probability. A neighbouring tree of a burning pixel can ignite with <span id="TRANSMISSION_PROBABILITY"></span>. All burning cells become burned, and all burned cells can become a tree again with <span id="TREE_REGENERATION_PROBABILITY"></span> probability. On the map, red cells are burning and purple cells represent burned areas.
         </div>
         <canvas id="canvas" width="928" height="800"/>
