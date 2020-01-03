@@ -1,0 +1,56 @@
+<html>
+    <style>
+        body {
+            padding: 40px;
+            margin: 0px;
+            background: #263238;
+            color: rgba(255, 255, 255, 0.75);
+            font-family: "Courier";
+        }
+
+        canvas {
+            display: block;
+            position: relative;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.75);
+        }
+
+        #text-container {
+            margin-left: auto;
+            margin-right: auto;
+            width: 928px;
+            margin-bottom: 40px;
+        }
+
+        #title {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 20px;
+        }
+
+        #defaultCanvas0 {
+            display: none;
+        }
+
+        span {
+            font-weight: bold;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/p5@0.10.2/lib/p5.js"></script>
+    <script src="./constants.js"></script>
+    <script src="./utils.js"></script>
+    <script src="./wildfire.js"></script>
+    <body>
+        <div id="text-container">
+            <div id="title">Wildfire Spread</div>
+            This models wildfire spread through cellular automata. Any pixel in this image that has a hue +/- <span id="MAX_HUE_DELTA"></span> of <span id="BURNABLE_AREA_HUE"></span> is considered a tree. Any other cell is considered empty. At each timestep, a tree can ignite with a <span id="RANDOM_BURN_RATE_PROBABILITY"></span> probability. On the map, red cells are burning and purple cells represent burned areas.<br/><br/>
+            Iteration #<span id="ITERATIONS"></span>
+        </div>
+        <canvas id="canvas" width="928" height="800"/>
+    </body>
+    <script>
+        window.onload = setup;
+    </script>
+</html>
