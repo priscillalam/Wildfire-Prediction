@@ -1,0 +1,459 @@
+---
+title: "Does climate change affect wildfire frequency in the US?"
+author: "Priscilla Lam"
+date: "06-03-2019"
+output: html_document
+---
+
+### Background
+Wildfires have been increasing in frequency, size, and duration since the mid-1980s. In recent years, wildfire frequency in the western United States has been nearly quadruple the average wildfire frequency between 1970 to 1986, with the total area burned by these fires over six and a half times its previous level [^1]. Although there are many factors that contribute toward the observed increase in wildfire activity, warming and drying as a result of climate change are the main driving factors behind creating conditions that foster more vulnerable fire environments across forested systems. 
+
+Projections show that an average annual 1 degree Celsius temperature increase would increase the median burned area per year by as much as 600 percent in some forest types. 
+<br/>
+<br/>
+<center>
+![](https://www.c2es.org/site/assets/uploads/2017/10/p2001cde0g41001.jpg){width=300}
+</center>
+<br/>
+
+Warmer air draws moisture from vegetation and soil, increasing fuel aridity, a metric that considers lack of moisture in the air. This provides the dry fuel and conditions that feed wildfires. Previous research demonstrates that over half of the documented increases in fuel aridity since the 1970s and cumulative forest fire area since 1984 is due to anthropogenic climate change [^2]. Though the initial cause of a wildfire may not be related to climate conditions, the warmer and drier conditions due to climate change usually make it easier for those fires to spread [^3]. A study shows that variability in wildfire frequency from year to year is strongly associated with spring and summer temperatures (Spearman’s correlation of 0.76, P < 0.001, n = 34), and that a second-order polynomial fit to the regional temperature signal explains 66% of the variance in the annual incidence of these fires [^1]. More wildfires occur in warmer years compared to relatively cooler years.
+
+This suggests that as climate change intensifies, the potential for forest fires, especially in the western United States, will continue to increase. Increased forest fire activity in recent years has contributed to forest mortality, carbon emissions, periods of degraded air quality, and substantial fire-fighting expenditures; fire-fighting expenditures by federal land-management agencies regularly exceed $1 billion USD per year, as of 2016 [^1].
+
+I will investigate whether climate change affects wildfire frequency in the United States. I will also model historical wildfire data, and use this data as part of a fire forecasting artificial intelligence/machine learning model to predict wildfire location and burn area size in the United States until 2023.
+
+[^1]: Westerling, A. L., Hidalgo, H. G., Cayan, D. R., & Swetnam, T. W. (2006). Warming and earlier spring increase western US forest wildfire activity. science, 313(5789), 940-943.
+[^2]: Abatzoglou, J. T., & Williams, A. P. (2016). Impact of anthropogenic climate change on wildfire across western US forests. Proceedings of the National Academy of Sciences, 113(42), 11770-11775.
+[^3]: https://www.technologyreview.com/s/609111/did-climate-change-worsen-californias-devastating-fires-probably/
+
+### Data
+- Analysis is from the US Forest Service's Monitoring Trends in Burn Severity MTBS project
+- This data includes frequency, extent, and magnitude of all large wildland fires (includes wildfire, wildland fire use, and prescribed fire) in the conterminous United States (CONUS), Alaska, Hawaii, and Puerto Rico for the period of 1984 through 2014
+- US Forest Service data: https://catalog.data.gov/dataset/monitoring-trends-in-burn-severity-burned-area-boundaries-feature-layer-6322c, https://github.com/BuzzFeedNews/2018-07-wildfire-trends
+- Geospatial data (1): http://frap.fire.ca.gov/data/frapgisdata-sw-fireperimeters_download?fbclid=IwAR1HUFc75xUAQCzc4eF9XtcCpibNakAb1-RmpccK92xH-l4UQ7IIiyPiDrg
+- Geospatial data (2): https://www.fs.usda.gov/rds/archive/Product/RDS-2013-0009.4/?fbclid=IwAR374HGhkcW6ZIQgFx4ciGzPzdD73gK0A5pNwIfqOU-LH6bdt8tdEDRXD1Y
+
+### Preliminary Analysis
+To find a suitable dataset for the fire forecasting machine learning model, I wanted to identify a dataset that showed a trend between temperature and wildfire frequency. I selected a dataset published by the United States Forest Service as part of their Monitoring Trends in Burn Severity project. This dataset includes frequency, extent, magnitude of all large wildland fires (including wildfire, wildland fire use, and prescribed fire) in the conterminous United States, Alaska, Hawaii, and Puerto Rico for the period 1984 through 2014.
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+data.csv <- read.csv("http://enterprisecontent-usfs.opendata.arcgis.com/datasets/847db1a51b0c4bb0a3663bcbce32ccb1_63.csv")
+if (!require("ggplot2"))
+  install.packages("ggplot2", repos = "http://cran.us.r-project.org");
+if (!require("scales"))
+  install.packages("scales", repos = "http://cran.us.r-project.org");
+if (!require("rgdal"))
+  install.packages("rgdal", repos = "http://cran.us.r-project.org")
+if (!require("maptools"))
+  install.packages("maptools", repos = "http://cran.us.r-project.org")
+if (!require("rgeos"))
+  install.packages("rgeos", repos = "http://cran.us.r-project.org")
+if (!require("plyr"))
+  install.packages("plyr", repos = "http://cran.us.r-project.org")
+if (!require("wesanderson"))
+  install.packages("wesanderson", repos = "http://cran.us.r-project.org")
+
+library(ggplot2);
+library(scales);
+library(rgdal)
+library(rgeos)
+library(maptools)
+library(plyr)
+library(wesanderson)
+```
+
+To identify a trend between increased temperature and increased wildfire frequency, I used R to plot fires from this dataset grouped by year range and color coded by fire type (wildfire, wildfire use, prescribed, and unknown). In the plot below, each point represents one fire, with its y-value as the number of acres burned. The orange line represents the mean number of wildfires for each range.
+
+```{r PlotA}
+skip_by = 6
+
+year_breaks <- 
+  seq(
+    min(data.csv$YEAR) - skip_by, max(data.csv$YEAR) + skip_by,
+    by=skip_by
+  ) 
+data.csv$bins <- 
+  cut(
+    data.csv$YEAR,
+    breaks=year_breaks,
+    labels=head(year_breaks, -1)
+  )
+
+ggplot(
+  data=data.csv,
+  mapping=aes(group=bins, x=bins, y=ACRES)
+) +
+  geom_jitter(
+    alpha=0.2,
+    mapping=aes(x=bins, y=ACRES, color=FIRE_TYPE)
+  ) +
+  labs(
+    x="Year Range",
+    y="Acres Burned",
+    color="Fire Type"
+  ) +
+  stat_summary(
+    aes(x=bins, y=ACRES, group=1),
+    fun.y=mean,
+    colour="tomato",
+    geom="line",
+    size=1,
+    alpha=0.5
+  ) + 
+  coord_cartesian(
+    ylim=c(0, 40000)
+  ) +
+  scale_y_continuous(label=comma)
+```
+
+This is the data plotted on an individual year basis with the datapoints stacked in a vertical line. The fires are colored by fire type.
+
+```{r PlotB}
+qplot(
+  YEAR,
+  ACRES,
+  alpha=0.5,
+  data=data.csv,
+  mapping=aes(x=YEAR, y=ACRES, color=FIRE_TYPE)
+) +
+  labs(
+    x="Year",
+    y="Acres Burned",
+    color="Fire Type"
+  ) +
+  guides(alpha=FALSE) +
+  scale_y_continuous(label=comma)
+```
+
+Here, the fires are grouped by fire type and plotted by year. Each dot's size corresponds to the number of acres the fire burned. There is a higher concentration of fires at the top of the graph.
+
+```{r PlotC}
+ggplot(
+  data=data.csv,
+  mapping=aes(group=FIRE_TYPE, x=FIRE_TYPE, y=YEAR)
+) +
+  geom_jitter(
+    alpha=0.2,
+    mapping=aes(color=factor(YEAR), x=FIRE_TYPE, y=YEAR, size=ACRES),
+  ) +
+  labs(
+    x="Fire Type",
+    y="Year",
+    size="Acres Burned"
+  ) +
+  guides(fill=FALSE, color=FALSE, linetype=FALSE, shape=FALSE) +
+  scale_size_continuous(label=comma)
+```
+
+These plots show that the US Forest Service dataset aligns with the observation that temperature increase and increase in wildfire frequency and burn area are related.
+
+### Methods
+
+After verifying that there is a relationship between increased temperature over the years and wildfire frequency, I decided to use this dataset to create a fire forecasting machine learning model. My visualization shows historical wildfire location and burn severity/burn area size, as well as predictions for 2016 to 2023. My fire forecasting model follows a time series model, as it looks at data on a monthly and yearly basis.
+
+I followed the following steps to create the fire forecasting model:
+
+1. I used CSVs created from the US Forest Service’s GIS files as training data. I grouped each fire by: rounded latitude, rounded longitude, month, and year, where each coordinate was rounded to the nearest 0.5 degree. At each location and time, I store the cumulative acres burnt due to natural causes, human causes, and unknown causes.
+2. I constructed three vectors for each (latitude, longitude) pair with cells corresponding to months in the dataset. Since my dataset covers a span of 43 years, these vectors are 1 x 384 vectors. Each of the vectors store acres burned for either natural, human, or unknown causes. These vectors serve as the y-vector for the linear regression.
+3. For each (latitude, longitude) pair, I found which month the peak fire season occurred by summing the acres burned for each month of the year across all years in the dataset, and taking the argmax.
+4. For each (latitude, longitude) pair, I created a 1 x 384 vector that stored how far each month in the dataset was from the peak month. This served as my first x-vector.
+5. For each (latitude, longitude) pair, I created a 1 x 384 vector that stored what year each month in the dataset belonged to. This served as amy second x-vector.
+6. I used sklearn to run multivariate linear regression for each (latitude, longitude) pair taking in both feature vectors and the y-vector. This gave me a series of weights.
+7. I used the weights from the regression to predict the number of acres that will be burned in the next five years for each location. I wrote these predictions to a series of CSV files. I used multiple CSV files to help optimize the D3 visualization in the next step, since there were around 700,000 data points.
+8. To create an interactive map, I wrote my visualization in D3.js, which offers a reactive programming model and makes dynamic data easier to render. I used d3-slider for the timeline and rendered the acres burned for each location as proportional dots. Red represents burn area from primarily natural fires, blue represents burn area from human-caused fires, and yellow represents burn area from unknown causes.
+
+### Results
+
+<!-- D3.js Map visualization. Assets stored on Github pages. -->
+<div id="embed-container">
+  <style>
+    @import "https://priscillalam.github.io/Wildfire-Prediction/d3.slider.css";
+
+    #embed-container {
+        background: #263238;
+        color: #ffffff;
+        text-align: center;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    }
+  
+    svg {
+        display: inline-block;
+    }
+  
+    path {
+        fill: none;
+        stroke: #333;
+        stroke-width: .5px;
+    }
+  
+    .tick text {
+        font-family: "Courier";
+        fill: #ffffff;
+    }
+    .land-boundary {
+        stroke: rgba(255, 255, 255, 0.5);
+        stroke-width: 0.5px;
+    }
+  
+    .state-boundary {
+        stroke: rgba(255, 255, 255, 0.5);
+    }
+  
+    .county-boundary {
+        stroke: rgba(255, 255, 255, 0.5);
+        display: none;
+    }
+
+    .site {
+        stroke-width: 1px;
+        stroke: rgba(0,0,0,0.25);
+    }
+
+    #map_slider {
+        margin: 20px 20px 10px 20px;
+        display: inline-block;
+    }
+  
+    #label {
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 20px;
+        margin-top: 20px;
+        margin-bottom: 40px;
+    }
+  
+    .d3-slider-handle {
+        border: none;
+        background: rgba(255, 255, 255, 0.75);
+    }
+  </style>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script src="https://d3js.org/topojson.v1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.3/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+  <script src="https://priscillalam.github.io/Wildfire-Prediction/d3.slider.js"></script>
+  <div id="label">Wildfire Predictor</div>
+  <div id="map_slider"></div>
+  <script>
+      let width = 700;
+      let height = 500;
+      let yearStart = 1992;
+      let yearEnd = 2024;
+
+      document.getElementById("map_slider").style.width = String(width) + "px";
+      let mapPath = "https://priscillalam.github.io/Wildfire-Prediction/us.json";
+
+      let projection = d3.geo.albersUsa()
+          .scale(width)
+          .translate([width / 2, height / 2]);
+
+      let path = d3.geo.path()
+          .projection(projection);
+
+      let svg = d3
+          .select("#embed-container")
+          .append("svg")
+          .attr("width", width)
+          .attr("height", height);
+
+      let firesByTime = {};
+      
+      let onMapReady = (error, us) => {
+          if (error) {
+              return console.error(error);
+          }
+
+          svg.append("path")
+            .datum(topojson.feature(us, us.objects.land))
+            .attr("d", path)
+            .attr("class", "land-boundary");
+
+          svg.append("path")
+                  .datum(topojson.mesh(us, us.objects.counties,
+                      (a, b) => {
+                          return a !== b && (a.id / 1000 | 0) === (b.id / 1000 | 0);
+                      }
+                  ))
+          .attr("d", path)
+          .attr("class", "county-boundary");
+
+          svg.append("path")
+              .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+              .attr("d", path)
+              .attr("class", "state-boundary");
+
+          for (let year = yearStart; year <= yearEnd; year++) {
+              for (let month = 1; month <= 12; month++) {
+                  let key = String(month) + String(year);
+                  d3.csv("https://priscillalam.github.io/Wildfire-Prediction/csv" + "/" + key + ".csv")
+                      .row(function(d) {
+                        return d;
+                      })
+                      .get(function(err, rows) {
+                          if (err) return console.error(err);
+                          firesByTime[key] = rows;
+                      });
+              }
+          }
+      };
+
+      let displaySites = (data) => {
+          let sites = svg.selectAll(".site")
+              .data(data, (d) => {
+                  if (projection([d.longitude, d.latitude]) == null) {
+                    return null;
+                  }
+                  return d.longitude + "," + d.latitude + ":" + d.month + "/" + d.year;
+              });
+
+          sites
+              .enter()
+              .append("circle")
+              .attr("class", "site")
+              .attr("cx", (d) => {
+                  let position = projection([d.longitude, d.latitude])
+                  if (position == null) {
+                      return -100;
+                  }
+                  return position[0];
+              })
+              .attr("cy", function(d) {
+                  let position = projection([d.longitude, d.latitude])
+                  if (position == null) {
+                      return -1;
+                  }
+                  return position[1];
+              })
+              .attr("r", function(d) {
+                  let clipToNumberOfAcres = 500;
+                  let totalAcresBurned = parseInt(d.human_acres_burned) +
+                      parseInt(d.unknown_acres_burned) + parseInt(d.natural_acres_burned);
+                  let maxDotSizePx = 10;
+                   return Math.min(maxDotSizePx, (totalAcresBurned / clipToNumberOfAcres));
+              })
+              .attr("fill", function(d) {
+                  let human_acres_burned = parseInt(d.human_acres_burned);
+                  let unknown_acres_burned = parseInt(d.unknown_acres_burned);
+                  let natural_acres_burned = parseInt(d.natural_acres_burned);
+                  if (human_acres_burned >= unknown_acres_burned && human_acres_burned >= natural_acres_burned) {
+                      return "#63cdda";
+                  }
+                  if (unknown_acres_burned >= human_acres_burned && unknown_acres_burned >= natural_acres_burned) {
+                      return "#f7d794";
+                  }
+                  return "#f8a5c2";
+              });
+
+          sites
+              .exit()
+              .remove();
+      };
+
+      let setUpSlider = () => {
+          let minDateUnix = moment(String(yearStart) + '-01-01', "YYYY MM DD").unix();
+          let maxDateUnix = moment(String(yearEnd) + '-12-31', "YYYY MM DD").unix();
+          let secondsInMonth = 60 * 60 * 24 * 30;
+
+          let sliderAxis =  d3
+              .svg
+              .axis()
+              .orient("top")
+              .tickFormat((d) => {
+                  return moment.unix(d).format('YYYY');
+              });
+
+          let slider = d3.slider()
+              .axis(sliderAxis)
+              .min(minDateUnix)
+              .max(maxDateUnix)
+              .step(secondsInMonth)
+              .on("slide", (evt, value) => {
+                  let date = moment.unix(value)
+                  let month = date.format('M');
+                  let year = date.format('YYYY');
+
+                  let label;
+                  if (year <= 2015) {
+                      label = "Historical ";
+                  } else {
+                      label = "Predicted "
+                  }
+  
+                  document.getElementById("label").innerHTML = label + month + "/" + year;
+                  let newData = firesByTime[month + year];
+                  displaySites(newData);
+              });
+
+          d3
+              .select('#map_slider')
+              .call(slider);
+      };
+
+      setUpSlider();
+      d3.json(mapPath, onMapReady);
+  </script>
+</div>
+
+### Model Verification
+Since my dataset ended in December 2015, I am able to verify my predictions from January 2016 until now. To verify that my prediction model is accurate, I manually verified random points. Though most of the points I verified were accurate, it is difficult to go through all of the predictions, especially since the US Forest Service hasn't released an updated dataset yet. 
+
+To verify that the general trend of my predictions are accurate, I plotted summer temperature and precipitation.
+
+<b>Summer Temperature and Precipitation in the US</b>
+``` {r Shape Setup}
+output_file <- file.path(tempdir(), "CONUS_CLIMATE_DIVISIONS.shp.zip", fsep = "\\")
+download.file("ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/CONUS_CLIMATE_DIVISIONS.shp.zip", output_file)
+utils::unzip(output_file, exdir = file.path(tempdir(), "CONUS_CLIMATE_DIVISIONS.shp"))
+```
+
+``` {r Map Setup}
+shapes <- readOGR(dsn=file.path(tempdir(), "CONUS_CLIMATE_DIVISIONS.shp"), stringsAsFactors=F)
+temperatures <- read.csv(file="temperatures.csv", skip = 3)
+precipitations <- read.csv(file="precipitation.csv", skip = 3)
+shapes@data$id = rownames(shapes@data)
+simplifiedShapes <- gSimplify(shapes, tol=0.01, topologyPreserve=TRUE)
+shapes <- SpatialPolygonsDataFrame(simplifiedShapes, data=shapes@data)
+shapes.df = fortify(shapes)
+shapes.df = join(shapes.df, shapes@data, by="id")
+temperature_shapes <- merge(shapes.df, temperatures, by.x="CLIMDIV", by.y="Location.ID", all=F)
+precipitation_shapes <- merge(shapes.df, precipitations, by.x="CLIMDIV", by.y = "Location.ID", all=F)
+```
+
+```{r Plot Temperature}
+ggplot() +
+  geom_polygon(data= temperature_shapes, aes(x=long, y=lat, group=group, fill=Value)) +
+  theme_void() +
+  scale_fill_gradient(low="#fce4ec", high="#880e4f", aesthetics="fill") +
+  labs(
+    fill="Temperature"
+  ) +
+  coord_fixed(ratio=1.4)
+```
+
+This map shows average summer temperature from June through August 2018.
+
+```{r Plot Precipitation}
+ggplot() +
+  geom_polygon(data=precipitation_shapes, aes(x=long, y=lat, group=group, fill=Value)) +
+  theme_void() +
+  scale_fill_gradient(low="#006064", high="#e0f7fa", aesthetics="fill") +
+  labs (
+    fill = "Precipitation"
+  ) +
+  coord_fixed(ratio=1.4)
+```
+
+The map shows average summer precipitation from June through August 2018.
+
+This locations with higher temperatures and drier conditions align with the prediction model for June through August 2018.
+
+<br/>
+<br/>
+<!-- Place this tag where you want the button to render. -->
+<a class="github-button" href="https://github.com/priscillalam/Wildfire-Prediction/archive/master.zip" data-size="large" aria-label="Download priscillalam/Wildfire-Prediction on GitHub">Link to code</a>
+<!-- Place this tag in your head or just before your close body tag. -->
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+<br/>
+<br/>
